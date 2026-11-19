@@ -1,0 +1,26 @@
+{
+  "name": "distill-bench",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Nightly benchmark: Claude Code with and without distill on real documents",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nievesjesus/distill-bench.git"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "bench": "node run.mjs",
+    "bench:fetch": "node fetch.mjs",
+    "bench:report": "node report.mjs",
+    "bench:install-nightly": "node install-nightly.mjs",
+    "bench:uninstall-nightly": "node uninstall-nightly.mjs"
+  },
+  "devDependencies": {
+    "vitest": "5.1.0"
+  }
+}
