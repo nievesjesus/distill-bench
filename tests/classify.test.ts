@@ -41,6 +41,14 @@ describe('classifyPaths', () => {
     expect(await paths([tool('a', 'Bash', { command: 'distill-llm convert a.xlsx --stdout | head -50' })])).toEqual(['skill-distill']);
   });
 
+  it('labels OpenCode skill calls and distill CLI variants', async () => {
+    expect(await paths([tool('a', 'skill', { name: 'distill-documents' })])).toEqual(['skill-distill']);
+    expect(await paths([tool('a', 'skill', { name: 'other' })])).toEqual([]);
+    expect(await paths([tool('a', 'Bash', { command: 'npx -y distill-llm@0.9.0 grep "x" "a.pdf"' })])).toEqual(['skill-distill']);
+    expect(await paths([tool('a', 'Bash', { command: 'node /p/node_modules/distill-llm/dist/cli.js convert --stdout a.pdf' })])).toEqual(['skill-distill']);
+    expect(await paths([tool('a', 'Bash', { command: 'cat ~/.cache/distill-llm/out/abc.md' })])).toEqual(['bash-other']);
+  });
+
   it('labels PDF command line tools', async () => {
     for (const command of ['pdftotext -layout a.pdf - | grep x', 'pdfinfo a.pdf', 'cd /p && mutool draw -o x.png a.pdf 1', 'qpdf --show-npages a.pdf', 'gs -sDEVICE=txtwrite -o - a.pdf', '/opt/homebrew/bin/pdftoppm -r 80 a.pdf out', 'textutil -convert txt a.docx']) {
       expect(await paths([tool('a', 'Bash', { command })])).toEqual(['bash-pdftools']);
