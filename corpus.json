@@ -158,5 +158,29 @@
     "ext": "pptx",
     "license": "Public domain (US government work)",
     "title": "NASA ACCESS rationale briefing"
+  },
+  {
+    "id": "census-1950-enum-manual",
+    "url": "https://www.census.gov/content/dam/Census/programs-surveys/decennial/technical-documentation/questionnaires/1950instructions.pdf",
+    "sha256": "1d7181fdccf504abf8e0f43d50e1b194d371af6864be98eecdb795ad57e3ced7",
+    "ext": "pdf",
+    "license": "Public domain (US government work)",
+    "title": "1950 Census Enumerator's Reference Manual, population and housing paragraphs (scanned, no text layer)"
+  },
+  {
+    "id": "librivox-80days-ch1-3",
+    "url": "https://archive.org/download/around_the_world_in_eighty_days_0908_librivox/80days_01_verne_64kb.mp3",
+    "sha256": "d210f4ac3e025a9ed78466f05f746d25eb158167a744b007445ec734abca3621",
+    "ext": "mp3",
+    "license": "Public domain (LibriVox recording, no rights reserved; text by Jules Verne, Towle translation)",
+    "title": "Around the World in Eighty Days, chapters 1-3 (LibriVox, read by Alex Foster)"
+  },
+  {
+    "id": "nasa-mro-follow-the-water",
+    "url": "https://archive.org/download/mars-orbiter-helps-scientists-follow-the-water-wR6sYM6r5JU/mars-orbiter-helps-scientists-follow-the-water-wR6sYM6r5JU.mp4",
+    "sha256": "6459605020e5c3a5bfe79bc00120196fb88b576962fd30b7028d4492cbd50c4f",
+    "ext": "mp4",
+    "license": "Public domain (NASA media)",
+    "title": "NASA: Mars Orbiter Helps Scientists Follow the Water (2 min video)"
   }
 ]

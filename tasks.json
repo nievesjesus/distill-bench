@@ -639,5 +639,318 @@
       "office"
     ],
     "source": "xlsx sheet SP800-171A rows 3-8: 3.1.1[a] to 3.1.1[f]; row 9 starts 3.1.2"
+  },
+  {
+    "id": "ls-911-failures",
+    "doc": "911-report",
+    "question": "In the 9/11 Commission Report's chapter 11 'Foresight-and-Hindsight', the Commission says the 9/11 attacks revealed four kinds of failures. Name the four. Put the whole list on the ANSWER line.",
+    "expected": {
+      "type": "facts",
+      "value": [
+        "imagination",
+        "policy",
+        "capabilities",
+        "management"
+      ],
+      "min": 4
+    },
+    "tags": [
+      "long-summary"
+    ],
+    "source": "pdftotext p357 (report p339), start of chapter 11: 'four kinds of failures: in imagination, policy, capabilities, and management'; page rendered at 80 dpi and read"
+  },
+  {
+    "id": "ls-airmf-trustworthy",
+    "doc": "nist-ai-rmf",
+    "question": "According to the NIST AI Risk Management Framework 1.0, what are the characteristics of trustworthy AI systems? List all of them on the ANSWER line.",
+    "expected": {
+      "type": "facts",
+      "value": [
+        "valid",
+        "safe",
+        "secure",
+        "accountable",
+        "explainable",
+        "privacy",
+        "fair"
+      ],
+      "min": 6
+    },
+    "tags": [
+      "long-summary"
+    ],
+    "source": "pdftotext p17, section 3 'AI Risks and Trustworthiness': valid and reliable, safe, secure and resilient, accountable and transparent, explainable and interpretable, privacy-enhanced, fair with harmful bias managed (7 items; min 6 tolerates one omission)"
+  },
+  {
+    "id": "ls-mamba-contributions",
+    "doc": "arxiv-mamba",
+    "question": "The Mamba paper's introduction describes three contributions of its approach, each under a bold heading. Name the three. Put the whole list on the ANSWER line.",
+    "expected": {
+      "type": "facts",
+      "value": [
+        "selection",
+        "hardware",
+        "architecture"
+      ],
+      "min": 3
+    },
+    "tags": [
+      "long-summary"
+    ],
+    "source": "pdftotext p2, introduction: 'Selection Mechanism.', 'Hardware-aware Algorithm.', 'Architecture.' (three bold run-in headings)"
+  },
+  {
+    "id": "ls-csf-tiers",
+    "doc": "nist-csf2",
+    "question": "NIST CSF 2.0 defines Implementation Tiers that characterize the rigor of an organization's cybersecurity risk governance and management practices. Name the four Tiers in order. Put the whole list on the ANSWER line.",
+    "expected": {
+      "type": "facts",
+      "value": [
+        "partial",
+        "informed",
+        "repeatable",
+        "adaptive"
+      ],
+      "min": 4
+    },
+    "tags": [
+      "long-summary"
+    ],
+    "source": "pdftotext p12 and p31: 'Partial (Tier 1), Risk Informed (Tier 2), Repeatable (Tier 3), and Adaptive (Tier 4)' ('informed' matches 'Risk Informed' and 'risk-informed')"
+  },
+  {
+    "id": "ls-fm-applications",
+    "doc": "arxiv-foundation-models",
+    "question": "In the 'On the Opportunities and Risks of Foundation Models' report, the overview of applications (section 1.4.2) says which three application areas the report discusses in depth? Put the three on the ANSWER line.",
+    "expected": {
+      "type": "facts",
+      "value": [
+        "healthcare",
+        "law",
+        "education"
+      ],
+      "min": 3
+    },
+    "tags": [
+      "long-summary"
+    ],
+    "source": "pdftotext p15, section 1.4.2 'Overview of applications': 'we have chosen three applications — healthcare, law, and education'"
+  },
+  {
+    "id": "scan-census50-nights",
+    "doc": "census-1950-enum-manual",
+    "question": "In the 1950 Census Enumerator's Reference Manual excerpt, paragraph 80a covers persons who work away from home but sleep most of the week in one locality. How many nights of the week (at least) must a person sleep in an ED to be enumerated as a resident of it? Answer with a number.",
+    "expected": {
+      "type": "number",
+      "value": 4
+    },
+    "tags": [
+      "scanned"
+    ],
+    "source": "Scanned PDF p3 (printed p. 1-465), para 80a: 'they sleep most of the week (four nights or more)'. Proof of no text layer: pdftotext on the whole file returns 24 bytes (only 24 form feeds, 24 pages); pdfimages -list shows one full-page 1275x1668 150-ppi JPEG scan per page (Creator: Adobe Photoshop 6.0). Answer read from the page rendered with pdftoppm -r 100."
+  },
+  {
+    "id": "scan-census50-infant",
+    "doc": "census-1950-enum-manual",
+    "question": "In the 1950 Census Enumerator's Reference Manual excerpt, paragraph 66 describes the Infant Card. In which months of 1950 must an infant have been born for the card to be filled out? Put the months on the ANSWER line.",
+    "expected": {
+      "type": "facts",
+      "value": [
+        "january",
+        "february",
+        "march"
+      ],
+      "min": 3
+    },
+    "tags": [
+      "scanned"
+    ],
+    "source": "Scanned PDF p1 (printed p. 1-463), para 66: 'born in January, February, or March, 1950'. Proof of no text layer: pdftotext on the whole file returns 24 bytes (only 24 form feeds, 24 pages); pdfimages -list shows one full-page 1275x1668 150-ppi JPEG scan per page (Creator: Adobe Photoshop 6.0). Answer read from the page rendered with pdftoppm -r 100."
+  },
+  {
+    "id": "scan-census50-para74",
+    "doc": "census-1950-enum-manual",
+    "question": "In the 1950 Census Enumerator's Reference Manual excerpt, which paragraph number is titled 'Persons to enumerate in each household'? Answer with the paragraph number.",
+    "expected": {
+      "type": "number",
+      "value": 74
+    },
+    "tags": [
+      "scanned"
+    ],
+    "source": "Scanned PDF p2 (printed p. 1-464), left column: '74. Persons to enumerate in each household.' Proof of no text layer: pdftotext on the whole file returns 24 bytes (only 24 form feeds, 24 pages); pdfimages -list shows one full-page 1275x1668 150-ppi JPEG scan per page (Creator: Adobe Photoshop 6.0). Answer read from the page rendered with pdftoppm -r 100."
+  },
+  {
+    "id": "scan-census50-age14",
+    "doc": "census-1950-enum-manual",
+    "question": "In the 1950 Census Enumerator's Reference Manual excerpt, paragraph 62 says questions 15 to 20c on the Population Schedule are asked of persons of what minimum age, in years? Answer with a number.",
+    "expected": {
+      "type": "number",
+      "value": 14
+    },
+    "tags": [
+      "scanned"
+    ],
+    "source": "Scanned PDF p1 (printed p. 1-463), para 62: 'questions 15 to 20c for persons 14 years of age and over'. Proof of no text layer: pdftotext on the whole file returns 24 bytes (only 24 form feeds, 24 pages); pdfimages -list shows one full-page 1275x1668 150-ppi JPEG scan per page (Creator: Adobe Photoshop 6.0). Answer read from the page rendered with pdftoppm -r 100."
+  },
+  {
+    "id": "aud-80days-shaving-water",
+    "doc": "librivox-80days-ch1-3",
+    "question": "In the LibriVox recording of 'Around the World in Eighty Days', Phileas Fogg dismisses his servant James Forster because he brought shaving-water at the wrong temperature. At how many degrees Fahrenheit was the water that he brought? Answer with a number.",
+    "expected": {
+      "type": "number",
+      "value": 84
+    },
+    "tags": [
+      "audio"
+    ],
+    "source": "Project Gutenberg #103 (Towle translation), chapter I, paragraph 11: 'shaving-water at eighty-four degrees Fahrenheit instead of eighty-six'. ASR at 5:53. Spoken text also checked by transcribing the MP3 with an independent small ASR model (Vosk small-en-us-0.15) at the stated timestamp, which matched the Gutenberg text."
+  },
+  {
+    "id": "aud-80days-columns",
+    "doc": "librivox-80days-ch1-3",
+    "question": "In the LibriVox recording of 'Around the World in Eighty Days', the circular gallery of the Reform Club has a dome supported by how many red porphyry Ionic columns? Answer with a number.",
+    "expected": {
+      "type": "number",
+      "value": 20
+    },
+    "tags": [
+      "audio"
+    ],
+    "source": "Project Gutenberg #103, chapter I, paragraph 9: 'a dome supported by twenty red porphyry Ionic columns'. ASR at 4:35. Spoken text also checked by transcribing the MP3 with an independent small ASR model (Vosk small-en-us-0.15) at the stated timestamp, which matched the Gutenberg text."
+  },
+  {
+    "id": "aud-80days-houses",
+    "doc": "librivox-80days-ch1-3",
+    "question": "In the LibriVox recording of 'Around the World in Eighty Days', Passepartout is said to have already served in how many English houses before entering Mr. Fogg's service? Answer with a number.",
+    "expected": {
+      "type": "number",
+      "value": 10
+    },
+    "tags": [
+      "audio"
+    ],
+    "source": "Project Gutenberg #103, chapter II, paragraph 7: 'he had already served in ten English houses'. ASR at 12:07. Spoken text also checked by transcribing the MP3 with an independent small ASR model (Vosk small-en-us-0.15) at the stated timestamp, which matched the Gutenberg text."
+  },
+  {
+    "id": "aud-80days-steps",
+    "doc": "librivox-80days-ch1-3",
+    "question": "In the LibriVox recording of 'Around the World in Eighty Days', on his walk to the Reform Club, how many times does Phileas Fogg put his right foot before his left? Answer with a number.",
+    "expected": {
+      "type": "number",
+      "value": 575
+    },
+    "tags": [
+      "audio"
+    ],
+    "source": "Project Gutenberg #103, chapter III, paragraph 1: 'his right foot before his left five hundred and seventy-five times, and his left foot before his right five hundred and seventy-six times'. ASR at 15:41. Spoken text also checked by transcribing the MP3 with an independent small ASR model (Vosk small-en-us-0.15) at the stated timestamp, which matched the Gutenberg text."
+  },
+  {
+    "id": "vid-mro-lander",
+    "doc": "nasa-mro-follow-the-water",
+    "question": "In the NASA video 'Mars Orbiter Helps Scientists Follow the Water', the narrator says the Mars Reconnaissance Orbiter also serves as a communications relay for missions that land on Mars, such as a lander from 2007. Which lander mission is it? Answer with its name.",
+    "expected": {
+      "type": "text",
+      "value": "Phoenix"
+    },
+    "tags": [
+      "video"
+    ],
+    "source": "Narration at ~0:40-1:01: 'a communications relay satellite for missions that land on Mars like the 2007 Phoenix Mars Lander mission'. Verified by transcribing the audio track with Vosk small-en-us-0.15 (independent of distill) and reading the sentence at the stated timestamp; the video has no on-screen text for these facts. Video is 137 s, 35 MB."
+  },
+  {
+    "id": "vid-mro-msl-launch",
+    "doc": "nasa-mro-follow-the-water",
+    "question": "In the NASA video 'Mars Orbiter Helps Scientists Follow the Water', the upcoming Mars Science Laboratory rover mission is described as scheduled to launch in which month and year? Put both on the ANSWER line.",
+    "expected": {
+      "type": "facts",
+      "value": [
+        "november",
+        "2011"
+      ],
+      "min": 2
+    },
+    "tags": [
+      "video"
+    ],
+    "source": "Narration at ~1:01: 'the upcoming MSL or Mars Science Laboratory rover mission scheduled to launch in November 2011'. Verified by transcribing the audio track with Vosk small-en-us-0.15 (independent of distill) and reading the sentence at the stated timestamp; the video has no on-screen text for these facts. Video is 137 s, 35 MB."
+  },
+  {
+    "id": "vid-mro-years-ago",
+    "doc": "nasa-mro-follow-the-water",
+    "question": "In the NASA video 'Mars Orbiter Helps Scientists Follow the Water', the opening narration says the Mars Reconnaissance Orbiter launched how many years ago? Answer with a number.",
+    "expected": {
+      "type": "number",
+      "value": 5
+    },
+    "tags": [
+      "video"
+    ],
+    "source": "Narration at 0:00: 'Five years ago, NASA's Mars Reconnaissance Orbiter launched in search of evidence that water persisted on the surface of Mars'. Verified by transcribing the audio track with Vosk small-en-us-0.15 (independent of distill) and reading the sentence at the stated timestamp; the video has no on-screen text for these facts. Video is 137 s, 35 MB."
+  },
+  {
+    "id": "mf-families-diff",
+    "docs": [
+      "nist-sp800-53r5",
+      "nist-sp800-171r3"
+    ],
+    "question": "How many more families does NIST SP 800-53 Rev. 5 organize its controls into than NIST SP 800-171 Rev. 3 organizes its security requirements into? Answer with a number.",
+    "expected": {
+      "type": "number",
+      "value": 3
+    },
+    "tags": [
+      "multi"
+    ],
+    "source": "pdftotext: 800-53r5 p35 'organized into 20 families'; 800-171r3 p13 'organized into 17 families'; 20 - 17 = 3"
+  },
+  {
+    "id": "mf-functions-sum",
+    "docs": [
+      "nist-csf2",
+      "nist-ai-rmf"
+    ],
+    "question": "How many Functions are there in total across the Core of NIST CSF 2.0 and the Core of the NIST AI RMF 1.0 (add the two counts)? Answer with a number.",
+    "expected": {
+      "type": "number",
+      "value": 10
+    },
+    "tags": [
+      "multi"
+    ],
+    "source": "pdftotext: CSF 2.0 p8 six Functions (GOVERN, IDENTIFY, PROTECT, DETECT, RESPOND, RECOVER); AI RMF p25 four functions (GOVERN, MAP, MEASURE, MANAGE); 6 + 4 = 10"
+  },
+  {
+    "id": "mf-depletion-gap",
+    "docs": [
+      "erp-2024",
+      "cms-trustees-2024"
+    ],
+    "question": "The 2024 Economic Report of the President gives a projected depletion year for the combined Social Security Trust Funds, and the 2024 Medicare Trustees Report gives one for the Hospital Insurance trust fund. How many years later is the HI depletion year than the Social Security one? Answer with a number.",
+    "expected": {
+      "type": "number",
+      "value": 2
+    },
+    "tags": [
+      "multi"
+    ],
+    "source": "ERP pdf p143 (printed 138, page rendered and read): depletion of 'the combined Social Security Trust Funds beginning ... 2034'; CMS pdf p13 (rendered and read): HI depletion 2036; 2036 - 2034 = 2"
+  },
+  {
+    "id": "mf-ss-vs-medicare",
+    "docs": [
+      "erp-2024",
+      "cms-trustees-2024"
+    ],
+    "question": "The 2024 Economic Report of the President says Social Security provides income support to roughly how many million beneficiaries, and the 2024 Medicare Trustees Report says Medicare covered how many million people in 2023? By how many million is the first figure larger than the second? Answer with a number.",
+    "expected": {
+      "type": "number",
+      "value": 0.3,
+      "tolerance": 0.01
+    },
+    "tags": [
+      "multi"
+    ],
+    "source": "ERP pdf p140 (printed 135, rendered and read): '67 million beneficiaries' (rounded, 'roughly'); CMS pdf p13 (rendered and read): 'Medicare covered 66.7 million people'; 67 - 66.7 = 0.3"
   }
 ]

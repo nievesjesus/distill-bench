@@ -16,6 +16,7 @@
     "test": "vitest run",
     "bench": "node run.mjs",
     "bench:fetch": "node fetch.mjs",
+    "bench:asr-install": "node asr-install.mjs",
     "bench:report": "node report.mjs",
     "bench:install-nightly": "node install-nightly.mjs",
     "bench:uninstall-nightly": "node uninstall-nightly.mjs"

@@ -5,9 +5,10 @@ import { parseArgs } from './lib/args.mjs';
 import { acquireLock } from './lib/lock.mjs';
 import { buildPlan, budgetReached, finishedKeys, limitPaired, nightCost, unitKey } from './lib/plan.mjs';
 import { resolvePluginDir } from './lib/distill-repo.mjs';
-import { corpusDir, resultsDir } from './lib/paths.mjs';
+import { asrModelsInstalled, asrWarning, taskNeedsAsr } from './lib/asr.mjs';
+import { asrDir, corpusDir, resultsDir } from './lib/paths.mjs';
 import { runWithRetry } from './lib/runner.mjs';
-import { docFileName, loadCorpus, loadTasks, selectTasks, validate } from './lib/tasks.mjs';
+import { docFileName, loadCorpus, loadTasks, selectTasks, taskDocIds, validate } from './lib/tasks.mjs';
 
 function localNight() {
   const now = new Date();
@@ -76,6 +77,7 @@ async function main() {
   }
 
   try {
+    if (tasks.some(taskNeedsAsr) && !asrModelsInstalled(asrDir(env))) console.warn(asrWarning(asrDir(env)));
     const existing = readRecords(runsFile);
     if (args.resume) {
       const done = finishedKeys(existing);
@@ -120,14 +122,14 @@ async function main() {
         }
         continue;
       }
-      const doc = docs.get(unit.task.doc);
-      const docPath = resolveDocPath(doc, env);
-      if (docPath === null) {
-        console.error(`Skipping ${unit.task.id}: document ${doc.id} is not available (run bench:fetch)`);
+      const documents = taskDocIds(unit.task).map((id) => ({ doc: docs.get(id), docPath: resolveDocPath(docs.get(id), env) }));
+      const missing = documents.find((entry) => entry.docPath === null);
+      if (missing !== undefined) {
+        console.error(`Skipping ${unit.task.id}: document ${missing.doc.id} is not available (run bench:fetch)`);
         continue;
       }
       started += 1;
-      const final = await runWithRetry({ task: unit.task, doc, docPath, arm: unit.arm, repeat: unit.repeat, scenario: unit.scenario }, options, (record) => {
+      const final = await runWithRetry({ task: unit.task, documents, arm: unit.arm, repeat: unit.repeat, scenario: unit.scenario }, options, (record) => {
         appendFileSync(runsFile, `${JSON.stringify(record)}\n`);
         if (typeof record.costUsd === 'number') spent[unit.scenario] += record.costUsd;
       });

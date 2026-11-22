@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.setConfig({ testTimeout: 30_000 });
@@ -329,5 +330,35 @@ describe.skipIf(process.platform === 'win32')('bench runner with a fake claude',
     setup({ default: [{ kind: 'ok', answer: '5' }] }, [task('t1', 'd1', 5), task('t2', 'd2', 5), task('t3', 'd1', 5)]);
     const out = bench(['--dry-run', '--paired', '--max-runs', '3']);
     expect(out.stdout).toContain('2 runs planned');
+  });
+  it('copies every document of a multi-document task and lists them all in the prompt', async () => {
+    const multi = { id: 'm1', docs: ['d1', 'd2'], question: 'What is m1?', expected: { type: 'number', value: 5 }, tags: ['multi'], source: 'test' };
+    setup({ default: [{ kind: 'ok', answer: '5' }] }, [multi], ['d1', 'd2']);
+    const out = bench(['--arms', 'baseline']);
+    expect(out.status).toBe(0);
+    const c = calls();
+    expect(c).toHaveLength(1);
+    expect([...c[0].files].sort()).toEqual(['d1.pdf', 'd2.pdf']);
+    expect(c[0].argv.find((a: string) => a.startsWith('Answer this question'))).toBe('Answer this question about the files d1.pdf and d2.pdf in this folder: What is m1? Finish your reply with one line: ANSWER: <answer>.');
+    expect(records()[0]).toMatchObject({ task: 'm1', doc: 'd1+d2', ok: true, correct: true });
+  });
+
+  it('skips a multi-document task when one of its documents is missing, and dry-runs it', async () => {
+    const multi = { id: 'm1', docs: ['d1', 'd9'], question: 'What is m1?', expected: { type: 'number', value: 5 }, tags: ['multi'], source: 'test' };
+    setup({ default: [{ kind: 'ok', answer: '5' }] }, [multi], ['d1', 'd9']);
+    const dry = bench(['--dry-run']);
+    expect(dry.stdout).toContain('2 runs planned');
+    const out = bench([]);
+    expect(out.stderr).toContain('Skipping m1: document d9 is not available');
+    expect(calls()).toHaveLength(0);
+  });
+
+  it('builds the prompt for one, two and three documents', async () => {
+    const { buildPrompt } = await import(/* @vite-ignore */ pathToFileURL(join(repo, 'lib', 'runner.mjs')).href);
+    const tail = 'q? Finish your reply with one line: ANSWER: <answer>.';
+    expect(buildPrompt('a.pdf', 'q?')).toBe(`Answer this question about the file a.pdf in this folder: ${tail}`);
+    expect(buildPrompt(['a.pdf'], 'q?')).toBe(`Answer this question about the file a.pdf in this folder: ${tail}`);
+    expect(buildPrompt(['a.pdf', 'b.pdf'], 'q?')).toBe(`Answer this question about the files a.pdf and b.pdf in this folder: ${tail}`);
+    expect(buildPrompt(['a.pdf', 'b.pdf', 'c.pdf'], 'q?')).toBe(`Answer this question about the files a.pdf, b.pdf and c.pdf in this folder: ${tail}`);
   });
 });

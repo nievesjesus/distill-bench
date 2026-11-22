@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync, readlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const cfg = JSON.parse(readFileSync(process.env.FAKE_CODEX_CFG, 'utf8'));
 const argv = process.argv.slice(2);
@@ -7,6 +8,15 @@ const prompt = argv[argv.length - 1] ?? '';
 const arm = argv.some((a) => a.startsWith('mcp_servers.distill.command')) ? 'distill' : 'baseline';
 const file = /file (\S+) in this folder/.exec(prompt)?.[1] ?? 'unknown';
 const key = `${file}|${arm}`;
+
+const skillFile = join(process.env.HOME ?? '', '.agents', 'skills', 'distill-documents', 'SKILL.md');
+const cacheLink = (name) => {
+  try {
+    return readlinkSync(join(process.env.DISTILL_CACHE_DIR ?? '', name));
+  } catch {
+    return null;
+  }
+};
 
 appendFileSync(
   cfg.log,
@@ -18,6 +28,8 @@ appendFileSync(
     cacheDir: process.env.DISTILL_CACHE_DIR ?? null,
     pathHead: (process.env.PATH ?? '').split(':')[0],
     pid: process.pid,
+    skill: existsSync(skillFile) ? readFileSync(skillFile, 'utf8') : null,
+    cacheLinks: { asr: cacheLink('asr'), 'asr-models': cacheLink('asr-models') },
   })}\n`,
 );
 

@@ -86,6 +86,40 @@ describe('validate', () => {
   });
 });
 
+describe('validate with multiple documents', () => {
+  const docB = { ...doc, id: 'b' };
+  const { doc: _single, ...rest } = task;
+
+  it('accepts docs with every id in the corpus', async () => {
+    const { validate } = await load('tasks.mjs');
+    expect(validate([doc, docB], [{ ...rest, docs: ['a', 'b'] }])).toEqual([]);
+  });
+
+  it('requires exactly one of doc or docs', async () => {
+    const { validate } = await load('tasks.mjs');
+    expect(validate([doc, docB], [{ ...rest }])).toEqual([expect.stringContaining('exactly one of doc or docs')]);
+    expect(validate([doc, docB], [{ ...task, docs: ['a', 'b'] }])).toEqual([expect.stringContaining('exactly one of doc or docs')]);
+  });
+
+  it('flags unknown ids, duplicates and malformed docs', async () => {
+    const { validate } = await load('tasks.mjs');
+    expect(validate([doc, docB], [{ ...rest, docs: ['a', 'zzz'] }])).toEqual([expect.stringContaining('unknown doc zzz')]);
+    expect(validate([doc, docB], [{ ...rest, docs: ['a', 'a'] }])).toEqual([expect.stringContaining('duplicate doc in docs')]);
+    expect(validate([doc, docB], [{ ...rest, docs: [] }])).toEqual([expect.stringContaining('non-empty array')]);
+    expect(validate([doc, docB], [{ ...rest, docs: 'a' }])).toEqual([expect.stringContaining('non-empty array')]);
+  });
+
+  it('accepts the audio and video tags and labels a task by its joined ids', async () => {
+    const { validate, taskDocLabel, taskDocIds, selectTasks } = await load('tasks.mjs');
+    expect(validate([doc], [{ ...task, tags: ['audio', 'video'] }])).toEqual([]);
+    const multi = { ...rest, docs: ['a', 'b'] };
+    expect(taskDocLabel(multi)).toBe('a+b');
+    expect(taskDocLabel(task)).toBe('a');
+    expect(taskDocIds(multi)).toEqual(['a', 'b']);
+    expect(selectTasks([multi, task], 'doc:b')).toEqual([multi]);
+  });
+});
+
 describe('tagCoverage', () => {
   it('counts tasks per tag and lists empty tags', async () => {
     const { tagCoverage, TAGS } = await load('tasks.mjs');

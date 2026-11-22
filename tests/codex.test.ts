@@ -358,27 +358,90 @@ describe('codex in aggregate and report', () => {
   });
 });
 
+describe('prepareCodex', () => {
+  const sample = `Command: npx -y distill-llm@0.9.0
+== Codex CLI (and the ChatGPT desktop app) ==
+Command: codex mcp add distill -- /n/node /c/dist/cli.js mcp
+== shared skill (~/.agents/skills) ==
+File: /h/.agents/skills/distill-documents/SKILL.md -> /h/.agents/skills/distill-documents/SKILL.md
++ ---
++ name: distill-documents
++ ---
++ 
++ body
+`;
+  let root: string;
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'distill-bench-codex-prep-'));
+  });
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+  const skillFile = () => join(root, 'home', '.agents', 'skills', 'distill-documents', 'SKILL.md');
+
+  it('does nothing on the baseline arm', async () => {
+    const { prepareCodex } = await load('agents/codex.mjs');
+    const exec = vi.fn();
+    expect(prepareCodex({ arm: 'baseline', root, env: {}, packageSpec: 'distill-llm@0.9.0', exec })).toBeNull();
+    expect(exec).not.toHaveBeenCalled();
+    expect(existsSync(skillFile())).toBe(false);
+  });
+
+  it('writes the skill from the codex dry run into the per-run home on the distill arm', async () => {
+    const { prepareCodex } = await load('agents/codex.mjs');
+    const calls: { args: string[]; options: Rec }[] = [];
+    const exec = (command: string, args: string[], options: Rec) => {
+      calls.push({ args: [command, ...args], options });
+      return sample;
+    };
+    expect(prepareCodex({ arm: 'distill', root, env: { PATH: '/bin' }, baseEnv: { HOME: '/real' }, packageSpec: 'distill-llm@0.9.0', exec })).toBeNull();
+    expect(calls.map((c) => c.args)).toEqual([['npx', '-y', 'distill-llm@0.9.0', 'agents', 'install', '--codex', '--dry-run']]);
+    expect(calls[0].options).toMatchObject({ cwd: root, env: { PATH: '/bin', npm_config_cache: '/real/.npm' } });
+    expect(readFileSync(skillFile(), 'utf8')).toBe('---\nname: distill-documents\n---\n\nbody\n');
+  });
+
+  it('keeps the real home untouched with --user-settings', async () => {
+    const { prepareCodex } = await load('agents/codex.mjs');
+    const exec = vi.fn(() => sample);
+    expect(prepareCodex({ arm: 'distill', root, env: {}, packageSpec: 's', userSettings: true, exec })).toBeNull();
+    expect(exec).not.toHaveBeenCalled();
+    expect(existsSync(skillFile())).toBe(false);
+  });
+
+  it('reports a failed dry run as an error and skips a missing skill section', async () => {
+    const { prepareCodex } = await load('agents/codex.mjs');
+    const failing = () => {
+      throw Object.assign(new Error('Command failed'), { stderr: 'npm error network down\n' });
+    };
+    expect(prepareCodex({ arm: 'distill', root, env: {}, packageSpec: 's', exec: failing })).toBe('distill agents install --dry-run failed: npm error network down');
+    expect(prepareCodex({ arm: 'distill', root, env: {}, packageSpec: 's', exec: () => 'nothing' })).toBeNull();
+    expect(existsSync(skillFile())).toBe(false);
+  });
+});
+
 describe.skipIf(process.platform === 'win32')('bench runner with a fake codex', () => {
   let dir: string;
   let results: string;
   let log: string;
   let fake: string;
   let home: string;
+  let npxLog: string;
+  let shims: string;
 
-  const task = (id: string, doc: string, value: number) => ({ id, doc, question: `What is ${id}?`, expected: { type: 'number', value }, tags: ['simple'], source: 'test' });
+  const task = (id: string, doc: string, value: number, extra: Rec = {}) => ({ id, doc, question: `What is ${id}?`, expected: { type: 'number', value }, tags: ['simple'], source: 'test', ...extra });
   const docEntry = (id: string) => ({ id, url: `https://example.com/${id}.pdf`, sha256: sha, ext: 'pdf', license: 'test', title: id });
 
-  function setup(behaviors: Record<string, unknown[]>, tasksList = [task('t1', 'd1', 5), task('t2', 'd2', 7)]) {
+  function setup(behaviors: Record<string, unknown[]>, tasksList = [task('t1', 'd1', 5), task('t2', 'd2', 7)], extra: Rec = {}) {
     writeFileSync(join(dir, 'corpus.json'), JSON.stringify(['d1', 'd2'].map(docEntry)));
     writeFileSync(join(dir, 'tasks.json'), JSON.stringify(tasksList));
-    writeFileSync(join(dir, 'cfg.json'), JSON.stringify({ log, counter: join(dir, 'counter'), behaviors }));
+    writeFileSync(join(dir, 'cfg.json'), JSON.stringify({ log, npxLog, counter: join(dir, 'counter'), behaviors, ...extra }));
   }
 
   function bench(args: string[], extraEnv: Record<string, string> = {}) {
     return spawnSync(
       process.execPath,
       [join(repo, 'run.mjs'), '--agent', 'codex', '--tasks-file', join(dir, 'tasks.json'), '--corpus-file', join(dir, 'corpus.json'), '--results', results, '--distill-repo', join(dir, 'distill'), '--codex-bin', fake, '--package', 'distill-llm@9.9.9', '--night', '2026-11-19', ...args],
-      { encoding: 'utf8', env: { ...process.env, DISTILL_BENCH_DIR: join(dir, 'bench'), FAKE_CODEX_CFG: join(dir, 'cfg.json'), CODEX_HOME: home, ...extraEnv }, timeout: 60_000 },
+      { encoding: 'utf8', env: { ...process.env, PATH: `${shims}:${process.env.PATH}`, DISTILL_BENCH_DIR: join(dir, 'bench'), FAKE_CODEX_CFG: join(dir, 'cfg.json'), FAKE_OPENCODE_CFG: join(dir, 'cfg.json'), CODEX_HOME: home, ...extraEnv }, timeout: 60_000 },
     );
   }
 
@@ -401,6 +464,11 @@ describe.skipIf(process.platform === 'win32')('bench runner with a fake codex', 
     dir = mkdtempSync(join(tmpdir(), 'distill-bench-codex-'));
     results = join(dir, 'results');
     log = join(dir, 'calls.jsonl');
+    npxLog = join(dir, 'npx.jsonl');
+    shims = join(dir, 'shims-bin');
+    mkdirSync(shims);
+    copyFileSync(join(repo, 'tests', 'fixtures', 'fake-npx.mjs'), join(shims, 'npx'));
+    chmodSync(join(shims, 'npx'), 0o755);
     fake = join(dir, 'fake-codex.mjs');
     home = join(dir, 'codex-home');
     mkdirSync(home);
@@ -452,6 +520,50 @@ describe.skipIf(process.platform === 'win32')('bench runner with a fake codex', 
     expect(distill.every((x) => overrides(x.argv).join('\n').includes(`DISTILL_CACHE_DIR="${x.cacheDir}"`))).toBe(true);
     expect(existsSync(join(results, '.lock-codex'))).toBe(false);
     expect(existsSync(join(results, '.lock'))).toBe(false);
+  });
+
+  it('gives only the distill arm the distill skill in its per-run home, as a real install does', () => {
+    setup({ default: [{ kind: 'ok', answer: '5' }] }, [task('t1', 'd1', 5)]);
+    bench([]);
+    const c = calls();
+    const distill = c.find((x) => x.key.endsWith('distill'));
+    const baseline = c.find((x) => x.key.endsWith('baseline'));
+    expect(distill.skill).toContain('name: distill-documents');
+    expect(baseline.skill).toBeNull();
+    const npx = readFileSync(npxLog, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    expect(npx).toHaveLength(1);
+    expect(npx[0].argv).toEqual(['-y', 'distill-llm@9.9.9', 'agents', 'install', '--codex', '--dry-run']);
+    expect(npx[0].npmCache).toBe(join(process.env.HOME ?? '', '.npm'));
+  });
+
+  it('records a run error and does not start codex when the skill cannot be read', () => {
+    setup({ default: [{ kind: 'ok', answer: '5' }] }, [task('t1', 'd1', 5)], { npxFail: 'agents' });
+    bench(['--arms', 'distill']);
+    expect(calls()).toHaveLength(0);
+    expect(records()[0]).toMatchObject({ ok: false, error: expect.stringContaining('distill agents install --dry-run failed') });
+  });
+
+  it('links the shared speech models into the cache of audio and video runs only', () => {
+    const asr = join(dir, 'shared-asr');
+    setup({ default: [{ kind: 'ok', answer: '5' }] }, [task('t1', 'd1', 5, { tags: ['audio'] }), task('t2', 'd2', 7, { tags: ['simple'] })]);
+    const out = bench([], { DISTILL_BENCH_ASR_DIR: asr });
+    expect(out.stderr).toContain('speech models are not installed');
+    expect(out.stderr.match(/speech models are not installed/g)).toHaveLength(1);
+    const c = calls();
+    expect(c).toHaveLength(4);
+    for (const x of c.filter((y) => y.key.startsWith('d1.pdf'))) expect(x.cacheLinks).toEqual({ asr: join(asr, 'asr'), 'asr-models': join(asr, 'asr-models') });
+    for (const x of c.filter((y) => y.key.startsWith('d2.pdf'))) expect(x.cacheLinks).toEqual({ asr: null, 'asr-models': null });
+    expect(c.filter((y) => y.key.startsWith('d1.pdf')).map((x) => x.key.split('|')[1]).sort()).toEqual(['baseline', 'distill']);
+  });
+
+  it('stays quiet about speech models when they are installed', () => {
+    const asr = join(dir, 'shared-asr');
+    mkdirSync(join(asr, 'asr', 'node_modules'), { recursive: true });
+    mkdirSync(join(asr, 'asr-models', 'model'), { recursive: true });
+    setup({ default: [{ kind: 'ok', answer: '5' }] }, [task('t1', 'd1', 5, { tags: ['video'] })]);
+    const out = bench(['--arms', 'baseline'], { DISTILL_BENCH_ASR_DIR: asr });
+    expect(out.stderr).not.toContain('speech models');
+    expect(calls()[0].cacheLinks.asr).toBe(join(asr, 'asr'));
   });
 
   it('records a refused MCP call as mcp-denied and a generic failure as use', () => {

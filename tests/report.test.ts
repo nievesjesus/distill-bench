@@ -82,6 +82,51 @@ describe('stats', () => {
   });
 });
 
+describe('paired absolute deltas', () => {
+  const sample = [
+    rec({ task: 't1', costUsd: 1, numTurns: 4 }),
+    distill({ task: 't1', costUsd: 0.5, numTurns: 6, usage: { input: 10, output: 5, cacheCreation: 50, cacheRead: 440 } }),
+    rec({ task: 't2', doc: 'd2', costUsd: 2, numTurns: 4 }),
+    distill({ task: 't2', doc: 'd2', costUsd: 3, numTurns: 4 }),
+    rec({ task: 't3', doc: 'd3', costUsd: 1, numTurns: 4 }),
+    distill({ task: 't3', doc: 'd3', costUsd: 0.25, numTurns: 2 }),
+  ];
+
+  it('computes the median per-task difference, distill minus baseline', async () => {
+    const { aggregate } = await load('aggregate.mjs');
+    const data = aggregate(sample, tasks);
+    const byTask = Object.fromEntries(data.scenarios.dev.pairs.map((p: { task: string }) => [p.task, p]));
+    expect(byTask.t1.costDelta).toBeCloseTo(-0.5);
+    expect(byTask.t1.tokenDelta).toBe(-500);
+    expect(byTask.t1.turnsDelta).toBe(2);
+    expect(byTask.t2.costDelta).toBeCloseTo(1);
+    const overall = data.scenarios.dev.overall;
+    expect(overall.costDelta).toEqual({ tasks: 3, median: expect.closeTo(-0.5, 5) });
+    expect(overall.tokensDelta).toEqual({ tasks: 3, median: 0 });
+    expect(overall.turnsDelta).toEqual({ tasks: 3, median: 0 });
+  });
+
+  it('leaves the cost delta empty when the agent has no cost', async () => {
+    const { aggregate } = await load('aggregate.mjs');
+    const noCost = sample.map((r) => ({ ...r, costUsd: null }));
+    const overall = aggregate(noCost, tasks).scenarios.dev.overall;
+    expect(overall.costDelta).toEqual({ tasks: 0, median: null });
+    expect(overall.tokensDelta.median).toBe(0);
+  });
+
+  it('prints the deltas beside the ratios', async () => {
+    const { aggregate } = await load('aggregate.mjs');
+    const { renderReport } = await load('render.mjs');
+    const text = renderReport(aggregate(sample, tasks));
+    expect(text).toMatch(/- Cost: median ratio .*median delta -\$0\.500 per task/);
+    expect(text).toMatch(/- Total input tokens: median ratio .*median delta \+0 tokens per task/);
+    expect(text).toContain('- Turns: median delta +0.0 per task');
+    const codex = renderReport(aggregate(sample.map((r) => ({ ...r, agent: 'codex', costUsd: null })), tasks));
+    expect(codex).toContain('- Cost: n/a, Codex does not report cost in USD');
+    expect(codex).toContain('- Turns: median delta');
+  });
+});
+
 describe('aggregate', () => {
   it('keeps only the last attempt of each unit', async () => {
     const { finalRecords } = await load('aggregate.mjs');
