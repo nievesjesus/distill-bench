@@ -33,7 +33,7 @@ describe('launchd plist', () => {
   it('renders every placeholder with escaped values', async () => {
     const { renderPlist, escapeXml } = await load();
     expect(escapeXml('a&b<c>"d\'')).toBe('a&amp;b&lt;c&gt;&quot;d&apos;');
-    const xml = renderPlist(read('launchd/dev.distill-bench.nightly.plist.template'), { SCRIPT: '/r/a&b/nightly.sh', ROOT: '/r/a&b', HOME: '/Users/x', LOG_DIR: '/Users/x/logs' });
+    const xml = renderPlist(read('launchd/dev.distill-bench.nightly.plist.template'), { SCRIPT: '/r/a&b/nightly.sh', ROOT: '/r/a&b', HOME: '/Users/x', LOG_DIR: '/Users/x/logs', CALENDAR_XML: '<key>Hour</key>', ENV_XML: '' });
     expect(xml).not.toMatch(/\{\{/);
     expect(xml).toContain('/r/a&amp;b/nightly.sh');
     expect(xml).toContain('<key>Label</key>\n  <string>dev.distill-bench.nightly</string>');
@@ -56,6 +56,55 @@ describe('launchd plist', () => {
     }
   });
 
+  it('keeps the default plist daily at 02:30 with no weekday and no budget key', async () => {
+    const { plistFor, launchdPaths } = await load();
+    const xml = plistFor(launchdPaths());
+    expect(xml).not.toContain('<key>Weekday</key>');
+    expect(xml).not.toContain('DISTILL_BENCH_BUDGET');
+    expect(xml).toContain('<key>StartCalendarInterval</key>\n  <dict>\n    <key>Hour</key>\n    <integer>2</integer>\n    <key>Minute</key>\n    <integer>30</integer>\n  </dict>');
+    expect(xml).toContain('<key>HOME</key>');
+    expect(plistFor(launchdPaths(), {})).toBe(xml);
+  });
+
+  it('renders weekday, hour, minute and budget', async () => {
+    const { plistFor, launchdPaths } = await load();
+    const xml = plistFor(launchdPaths(), { weekday: 0, hour: 3, minute: 5, budget: 12.5 });
+    expect(xml).toMatch(/<key>Weekday<\/key>\s*<integer>0<\/integer>\s*<key>Hour<\/key>\s*<integer>3<\/integer>\s*<key>Minute<\/key>\s*<integer>5<\/integer>/);
+    expect(xml).toMatch(/<key>EnvironmentVariables<\/key>\s*<dict>[\s\S]*<key>DISTILL_BENCH_BUDGET<\/key>\s*<string>12.5<\/string>[\s\S]*<\/dict>/);
+    expect(xml).not.toMatch(/\{\{/);
+  });
+
+  it('describes the schedule', async () => {
+    const { describeSchedule } = await load();
+    expect(describeSchedule({ hour: 2, minute: 30 })).toBe('every day at 02:30');
+    expect(describeSchedule({ weekday: 0, hour: 3, minute: 0 })).toBe('every Sunday at 03:00');
+  });
+
+  it('parses the schedule flags with defaults', async () => {
+    const { parseScheduleArgs } = await load();
+    expect(parseScheduleArgs([]).options).toEqual({ hour: 2, minute: 30 });
+    const { options, switches } = parseScheduleArgs(['--weekday', '0', '--hour=3', '--minute', '0', '--budget', '15', '--dry-run']);
+    expect(options).toEqual({ weekday: 0, hour: 3, minute: 0, budget: 15 });
+    expect(switches.has('dry-run')).toBe(true);
+  });
+
+  it.each([
+    [['--weekday', '7']],
+    [['--weekday', '-1']],
+    [['--hour', '24']],
+    [['--hour', 'x']],
+    [['--minute', '60']],
+    [['--minute', '1.5']],
+    [['--budget', '0']],
+    [['--budget', '-3']],
+    [['--budget', 'abc']],
+    [['--budget']],
+    [['--nope', '1']],
+  ])('rejects invalid flags %j', async (argv) => {
+    const { parseScheduleArgs } = await load();
+    expect(() => parseScheduleArgs(argv)).toThrow();
+  });
+
   it('rejects a template with an unknown placeholder', async () => {
     const { renderPlist } = await load();
     expect(() => renderPlist('{{NOPE}}', {})).toThrow('Missing plist value NOPE');
@@ -75,6 +124,24 @@ describe('install and uninstall scripts', () => {
     expect(out.stdout).toContain('This will:');
     expect(out.stdout).toContain('Dry run: nothing was changed.');
     expect(out.stdout).toContain('dev.distill-bench.nightly.plist');
+  });
+
+  it('install dry run prints the real schedule and budget', () => {
+    if (process.platform !== 'darwin') return;
+    const out = run('install-nightly.mjs', ['--dry-run', '--weekday', '0', '--hour', '3', '--minute', '0', '--budget', '15']);
+    expect(out.status).toBe(0);
+    expect(out.stdout).toContain('every Sunday at 03:00');
+    expect(out.stdout).toContain('up to $15 (DISTILL_BENCH_BUDGET in the plist)');
+    const defaults = run('install-nightly.mjs', ['--dry-run']);
+    expect(defaults.stdout).toContain('every day at 02:30');
+    expect(defaults.stdout).toContain('up to $15 (the nightly.sh default');
+  });
+
+  it.each([['--weekday', '9'], ['--hour', '25'], ['--minute', '99'], ['--budget', '0'], ['--budget', 'free']])('install rejects %s %s with exit 1', (flag, value) => {
+    const out = run('install-nightly.mjs', ['--dry-run', flag, value]);
+    expect(out.status).toBe(1);
+    expect(out.stderr).toContain(flag);
+    expect(out.stdout).not.toContain('This will:');
   });
 
   it.each(['install-nightly.mjs', 'uninstall-nightly.mjs'])('%s cancels without a terminal or --yes', (file) => {

@@ -2,11 +2,20 @@ import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createInterface } from 'node:readline/promises';
-import { LABEL, launchdPaths, plistFor } from './lib/launchd.mjs';
+import { LABEL, describeSchedule, launchdPaths, parseScheduleArgs, plistFor } from './lib/launchd.mjs';
 
-const args = new Set(process.argv.slice(2));
-const yes = args.has('--yes');
-const dryRun = args.has('--dry-run');
+let parsed;
+try {
+  parsed = parseScheduleArgs(process.argv.slice(2));
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+const { options, switches } = parsed;
+const yes = switches.has('yes');
+const dryRun = switches.has('dry-run');
+const when = describeSchedule(options);
+const budgetText = options.budget === undefined ? 'up to $15 (the nightly.sh default, DISTILL_BENCH_BUDGET overrides it)' : `up to $${options.budget} (DISTILL_BENCH_BUDGET in the plist)`;
 
 async function confirm(question) {
   if (yes) return true;
@@ -22,11 +31,11 @@ async function main() {
   const paths = launchdPaths();
   const uid = process.getuid();
   const lines = [
-    `Write ${paths.plist} (runs ${paths.script} every day at 02:30 local time, RunAtLoad off)`,
+    `Write ${paths.plist} (runs ${paths.script} ${when} local time, RunAtLoad off)`,
     `Create ${paths.logDir} for the logs`,
     `Run: launchctl bootout gui/${uid} ${paths.plist} (only if it is already loaded)`,
     `Run: launchctl bootstrap gui/${uid} ${paths.plist}`,
-    'Each night it spends up to $15 of your Claude Code usage (DISTILL_BENCH_BUDGET changes it).',
+    `Each run spends ${budgetText} of your Claude Code usage.`,
   ];
   console.log('This will:');
   for (const line of lines) console.log(`  - ${line}`);
@@ -46,11 +55,11 @@ async function main() {
     spawnSync('launchctl', ['bootout', `gui/${uid}`, paths.plist], { stdio: 'inherit' });
     console.log(`Unloaded the previous ${LABEL}`);
   }
-  writeFileSync(paths.plist, plistFor(paths));
+  writeFileSync(paths.plist, plistFor(paths, options));
   console.log(`Wrote ${paths.plist}`);
   const boot = spawnSync('launchctl', ['bootstrap', `gui/${uid}`, paths.plist], { stdio: 'inherit' });
   if (boot.status !== 0) throw new Error(`launchctl bootstrap failed with exit code ${boot.status}`);
-  console.log(`Loaded ${LABEL}. First run tonight at 02:30; logs in ${paths.logDir}. Remove it with: npm run bench:uninstall-nightly`);
+  console.log(`Loaded ${LABEL}. Schedule: ${when}; logs in ${paths.logDir}. Remove it with: npm run bench:uninstall-nightly`);
 }
 
 main().catch((error) => {
