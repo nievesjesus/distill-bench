@@ -31,6 +31,29 @@ const trivial = lines([
   completed(),
 ]);
 
+describe('parseCodexStream error message', () => {
+  const limit = 'You\u2019ve hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/settings/usage to purchase more credits or try again at 8:16 PM.';
+  const masked = 'You\u2019ve hit your usage limit. Upgrade to Pro (<url> visit <url> to purchase more credits or try again at 8:16 PM.';
+
+  it('keeps the first error message with urls masked', async () => {
+    const { parseCodexStream } = await load('agents/codex.mjs');
+    const parsed = parseCodexStream(lines([{ type: 'error', message: limit }, { type: 'turn.failed', error: { message: limit } }]));
+    expect(parsed.errorMessage).toBe(masked);
+    expect(parsed.errorMessage).not.toContain('chatgpt.com');
+  });
+
+  it('reads the message from turn.failed alone', async () => {
+    const { parseCodexStream } = await load('agents/codex.mjs');
+    const parsed = parseCodexStream(lines([{ type: 'turn.failed', error: { message: 'boom at https://x.test/y' } }]));
+    expect(parsed.errorMessage).toBe('boom at <url>');
+  });
+
+  it('has no error message on success', async () => {
+    const { parseCodexStream } = await load('agents/codex.mjs');
+    expect(parseCodexStream(trivial).errorMessage).toBeUndefined();
+  });
+});
+
 describe('parseCodexStream', () => {
   it('parses the trivial real run', async () => {
     const { parseCodexStream, summarizeCodex } = await load('agents/codex.mjs');
@@ -579,7 +602,7 @@ describe.skipIf(process.platform === 'win32')('bench runner with a fake codex', 
     bench(['--arms', 'baseline']);
     const recs = records();
     expect(recs).toHaveLength(2);
-    expect(recs[0]).toMatchObject({ ok: false, attempt: 1, error: 'codex reported turn_failed', correct: null });
+    expect(recs[0]).toMatchObject({ ok: false, attempt: 1, error: 'codex error quota exceeded', correct: null });
     expect(recs[1]).toMatchObject({ ok: true, attempt: 2, correct: true });
   });
 
