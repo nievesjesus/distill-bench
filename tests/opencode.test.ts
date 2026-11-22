@@ -62,6 +62,29 @@ describe('parseOpencodeStream', () => {
     expect(summarizeOpencode(garbage)).toBeNull();
   });
 
+  it('keeps the first error event as a trimmed message with URLs masked', async () => {
+    const { parseOpencodeStream } = await load('agents/opencode.mjs');
+    const event = {
+      type: 'error',
+      timestamp: 1795365400888,
+      sessionID: 'ses_x',
+      error: {
+        type: 'provider.quota',
+        message: "This request requires more credits, or fewer max_tokens. You requested up to 256000 tokens, but can only afford 73981. To increase, visit https://openrouter.ai/settings/keys/abc123 and adjust the key's monthly limit",
+        status: 402,
+        response: { body: '{}' },
+      },
+    };
+    const parsed = parseOpencodeStream(lines([start, event, { type: 'error', error: { type: 'other', message: 'second' } }]));
+    expect(parsed.errorMessage).toMatch(/^provider\.quota \(402\): This request requires more credits/);
+    expect(parsed.errorMessage).toContain('visit <url> and adjust');
+    expect(parsed.errorMessage).not.toContain('openrouter.ai');
+    expect(parsed.errorMessage).not.toContain('second');
+    expect(parsed.errorMessage.length).toBeLessThanOrEqual(300);
+    expect(parseOpencodeStream(lines([start, { type: 'error', error: { name: 'APIError' } }])).errorMessage).toBe('{"name":"APIError"}');
+    expect(parseOpencodeStream(trivial).errorMessage).toBeUndefined();
+  });
+
   it('reports a null cost when no step carries one', async () => {
     const { parseOpencodeStream, summarizeOpencode } = await load('agents/opencode.mjs');
     expect(summarizeOpencode(parseOpencodeStream(lines([start, text('x')]))).costUsd).toBeNull();
@@ -564,7 +587,7 @@ describe.skipIf(process.platform === 'win32')('bench runner with a fake opencode
     bench(['--arms', 'baseline']);
     const recs = records();
     expect(recs).toHaveLength(2);
-    expect(recs[0]).toMatchObject({ ok: false, attempt: 1, error: 'opencode reported error', correct: null });
+    expect(recs[0]).toMatchObject({ ok: false, attempt: 1, error: 'opencode error {"name":"APIError","data":{"message":"quota exceeded"}}', correct: null });
     expect(recs[1]).toMatchObject({ ok: true, attempt: 2, correct: true });
   });
 
