@@ -48,7 +48,7 @@ Useful options of `npm run bench`:
 | `--distill-repo <path>` | a local distill checkout for the plugin. By default the tag `v<version of --package>` is shallow-cloned into `~/.cache/distill-bench/distill-<version>/` once |
 | `--max-cost-usd`, `--max-runs`, `--resume`, `--results <dir>`, `--dry-run` | budget, caps, skip what tonight already did, results folder, print the plan |
 
-Both arms run in a fresh temp folder with a fresh distill cache (`DISTILL_CACHE_DIR`, supported by distill releases that include it, which is newer than 0.7.0; with older packages the cache is not isolated). User-level Claude settings and plugins are shared by both arms.
+Both arms run in a fresh temp folder with a fresh distill cache (`DISTILL_CACHE_DIR`, supported by distill releases that include it, which is newer than 0.7.0; with older packages the cache is not isolated). Both arms run with `--setting-sources project,local`, so the operator's user-level settings, plugins and hooks do not leak in; pass `--user-settings` to turn that isolation off. The distill arm also allows the plugin's MCP server (`mcp__plugin_distill_distill`), since headless mode refuses MCP calls that are not allowed.
 
 ## Where things go
 
@@ -62,13 +62,30 @@ Everything lives under `~/.cache/distill-bench/` (override with `DISTILL_BENCH_D
 
 ## Nightly job (macOS, opt in)
 
-Nothing is scheduled automatically. To run the benchmark every night at 02:30:
+Nothing is scheduled automatically. By default the benchmark runs every night at 02:30:
 
 ```bash
 npm run bench:install-nightly -- --dry-run   # print what it would do
 npm run bench:install-nightly                # asks for confirmation first (use --yes to skip the prompt)
 npm run bench:uninstall-nightly              # removes it, keeps results and logs
 ```
+
+The schedule and the budget are configurable:
+
+| Flag | Meaning | Default |
+| --- | --- | --- |
+| `--weekday <0-6>` | Day of the week, 0 is Sunday | every day |
+| `--hour <0-23>` | Hour, local time | 2 |
+| `--minute <0-59>` | Minute | 30 |
+| `--budget <usd>` | Positive spend cap, written as `DISTILL_BENCH_BUDGET` in the plist | not written, `nightly.sh` uses 15 |
+
+For example, a weekly run on Sundays at 03:00 with a 15 dollar budget:
+
+```bash
+npm run bench:install-nightly -- --weekday 0 --hour 3 --minute 0 --budget 15
+```
+
+Invalid values make the installer exit with an error before anything is changed.
 
 It writes `~/Library/LaunchAgents/dev.distill-bench.nightly.plist` and loads it with `launchctl bootstrap`. Each night `nightly.sh` fetches the documents, runs `node run.mjs --resume --scenario both --max-cost-usd $DISTILL_BENCH_BUDGET` (default 15 dollars, split between the two scenarios) over every task, including the Office ones, and refreshes the report.
 

@@ -11,10 +11,7 @@
   </array>
   <key>StartCalendarInterval</key>
   <dict>
-    <key>Hour</key>
-    <integer>2</integer>
-    <key>Minute</key>
-    <integer>30</integer>
+{{CALENDAR_XML}}
   </dict>
   <key>RunAtLoad</key>
   <false/>
@@ -23,7 +20,7 @@
   <key>EnvironmentVariables</key>
   <dict>
     <key>HOME</key>
-    <string>{{HOME}}</string>
+    <string>{{HOME}}</string>{{ENV_XML}}
   </dict>
   <key>StandardOutPath</key>
   <string>{{LOG_DIR}}/launchd.log</string>

@@ -84,9 +84,11 @@ describe.skipIf(process.platform === 'win32')('bench runner with a fake claude',
     const distill = c.filter((x) => x.key.endsWith('distill'));
     expect(distill.every((x) => x.argv.includes('--plugin-dir') && x.argv.includes(join(dir, 'distill', 'plugins', 'distill')))).toBe(true);
     expect(baseline.every((x) => !x.argv.includes('--plugin-dir'))).toBe(true);
-    const flags = (x: { argv: string[] }) => strip(x.argv).join(' ');
+    const flags = (x: { argv: string[] }) => strip(x.argv).join(' ').replace('Read,Grep,Glob,Bash,mcp__plugin_distill_distill', 'Read,Grep,Glob,Bash');
     expect(new Set([...baseline, ...distill].map(flags)).size).toBe(1);
-    expect(flags(baseline[0])).toContain('--model sonnet --output-format stream-json --verbose --max-turns 30 --allowedTools Read,Grep,Glob,Bash --max-budget-usd 2');
+    expect(flags(baseline[0])).toContain('--model sonnet --output-format stream-json --verbose --max-turns 30 --allowedTools Read,Grep,Glob,Bash --max-budget-usd 2 --setting-sources project,local');
+    expect(distill.every((x) => x.argv[x.argv.indexOf('--allowedTools') + 1] === 'Read,Grep,Glob,Bash,mcp__plugin_distill_distill')).toBe(true);
+    expect(baseline.every((x) => x.argv[x.argv.indexOf('--allowedTools') + 1] === 'Read,Grep,Glob,Bash')).toBe(true);
     expect(distill.every((x) => x.pluginPackage === 'distill-llm@9.9.9')).toBe(true);
     expect(baseline.every((x) => x.pluginPackage === null)).toBe(true);
     expect(new Set(c.map((x) => x.cacheDir)).size).toBe(4);
@@ -246,6 +248,15 @@ describe.skipIf(process.platform === 'win32')('bench runner with a fake claude',
     expect(calls()[0].pathHead).not.toMatch(/shims$/);
     expect(calls()[0].pythonNoUserSite).toBeNull();
     expect(records()[0].scenario).toBe('dev');
+  });
+
+  it('drops the isolation flag with --user-settings and records it', async () => {
+    setup({ default: [{ kind: 'ok', answer: '5' }] }, [task('t1', 'd1', 5)]);
+    bench(['--arms', 'baseline', '--user-settings']);
+    expect(calls()[0].argv).not.toContain('--setting-sources');
+    expect(records()[0]).toMatchObject({ userSettings: true, permissionDenials: 0 });
+    bench(['--arms', 'baseline', '--night', '2026-11-20']);
+    expect(records()[1]).toMatchObject({ userSettings: false });
   });
 
   it('records the tool paths of each run', async () => {
