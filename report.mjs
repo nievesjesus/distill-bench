@@ -6,7 +6,7 @@ import { renderReport } from './lib/render.mjs';
 import { loadTasks } from './lib/tasks.mjs';
 
 function parseReportArgs(argv) {
-  const values = { results: '', since: '', out: '', model: '' };
+  const values = { results: '', since: '', out: '', model: '', agent: '' };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--') continue;
@@ -18,7 +18,8 @@ function parseReportArgs(argv) {
     if (value === undefined || value.startsWith('--')) throw new Error(`--${key} needs a value`);
     values[key] = value;
   }
-  if (values.since !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(values.since)) throw new Error('--since must be YYYY-MM-DD');
+  if (values.agent !== '' && !['claude', 'codex', 'opencode'].includes(values.agent)) throw new Error('--agent must be claude, codex or opencode');
+  if (values.since !== '' &&!/^\d{4}-\d{2}-\d{2}$/.test(values.since)) throw new Error('--since must be YYYY-MM-DD');
   return values;
 }
 
@@ -41,6 +42,7 @@ function main() {
   let records = readRuns(join(results, 'runs.jsonl'));
   if (args.since !== '') records = records.filter((r) => r.night >= args.since);
   if (args.model !== '') records = records.filter((r) => r.model === args.model);
+  if (args.agent !== '') records = records.filter((r) => (r.agent ?? 'claude') === args.agent);
   const data = aggregate(records, loadTasks());
   const markdown = renderReport(data, { since: args.since });
   writeFileSync(out, `${markdown}\n`);
