@@ -50,13 +50,54 @@ Useful options of `npm run bench`:
 
 Both arms run in a fresh temp folder with a fresh distill cache (`DISTILL_CACHE_DIR`, supported by distill releases that include it, which is newer than 0.7.0; with older packages the cache is not isolated). Both arms run with `--setting-sources project,local`, so the operator's user-level settings, plugins and hooks do not leak in; pass `--user-settings` to turn that isolation off. The distill arm also allows the plugin's MCP server (`mcp__plugin_distill_distill`), since headless mode refuses MCP calls that are not allowed.
 
+## Codex
+
+The same tasks, arms, scenarios, grading and report also run against the OpenAI Codex CLI. Pass `--agent codex` (default `claude`):
+
+```bash
+npm run bench -- --agent codex --scenario clean --tasks tag:simple --paired --repeats 1 --max-runs 4
+npm run bench:report -- --agent codex
+```
+
+Each run is `codex exec --json --ephemeral --ignore-user-config --skip-git-repo-check -s read-only [-m MODEL] -c ... "<prompt>"` with stdin closed, in a fresh folder with only the document. `--ignore-user-config` skips `~/.codex/config.toml` but keeps your login, so the operator's own config, MCP servers and plugins do not leak in (the Codex counterpart of `--setting-sources project,local`). Everything else is set per run with `-c` overrides; `~/.codex` is never written. The same 15 minute wall limit applies.
+
+| option | meaning |
+| --- | --- |
+| `--agent claude\|codex` | which agent to run, default `claude` |
+| `--codex-model <name>` | default: top-level `model` of `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`); if absent, `-m` is omitted |
+| `--codex-reasoning low\|medium\|high` | default: top-level `model_reasoning_effort` of the same file; passed as `-c model_reasoning_effort="..."` |
+| `--codex-bin <path>` | the `codex` executable, default `codex` on `PATH` (or `DISTILL_BENCH_CODEX`) |
+
+The model and reasoning are recorded together as `model`, for example `gpt-6-astra/high`. `--model`, `--max-turns` and `--run-budget-usd` are Claude-only and ignored for Codex (Codex has no verified equivalent of `--max-turns`). `--user-settings` applies to both agents: for Codex it keeps the real `HOME`, so user skills come back.
+
+**Cost and usage.** Codex prints no cost in USD, and with a ChatGPT login its usage counts against plan limits, not dollars. Records carry `costUsd: null` and the report shows `n/a` in every cost column; the comparison is on total input tokens, turns and duration. `--max-cost-usd` does not apply, so for `--agent codex` the runner caps the run with `--max-runs`, defaulting to 20 when you did not pass one, and prints a note.
+
+**What the distill arm means for Codex.** Codex has no Read tool; it reads files through the shell, so distill's Read hook never applies. The distill arm only adds distill's MCP server (`mcp_servers.distill.*` overrides pointing at the plugin's `scripts/run.mjs mcp`, with `DISTILL_PLUGIN_PACKAGE`, `DISTILL_CACHE_DIR` and `CLAUDE_PLUGIN_ROOT` in the server's `env` table, because Codex sanitizes the MCP environment) and sets `default_tools_approval_mode="approve"` for it. The baseline arm has no MCP overrides at all. The `read`, `read-pages` and `read-converted` paths therefore never occur for Codex; shell reads show up as `bash-other` (or `bash-pdftools`, `bash-python`), MCP calls as `mcp-distill`, and an MCP call Codex refused for approval or permission as `mcp-denied`, so a refusal is never counted as use. A generic MCP failure counts as use.
+
+**Skill isolation.** Codex ignores `--ignore-user-config` for user skills (it reads `~/.agents/skills`), so each Codex run gets its own `HOME` under the run directory with `CODEX_HOME` pinned to the real Codex home (auth keeps working) and the distill MCP server gets the real `HOME` and `PATH`; `--user-settings` keeps the real `HOME` for Codex too.
+
+**Clean scenario caveat.** Codex runs shell commands through a login shell (`/bin/zsh -lc`), which can reset `PATH` and defeat the stubs. The runner passes `shell_environment_policy.inherit=all`, prepends the stub directory again through `shell_environment_policy.set`, and sets `allow_login_shell=false`, but the clean scenario is best effort for Codex. Check the `bash-pdftools` share in the clean section: a non-zero share there means the stubs were bypassed.
+
+**Token mapping.** Codex reports `input_tokens` with `cached_input_tokens` as a subset of it. The record keeps the Claude definition (`input` excludes cache, total input tokens is `input + cacheCreation + cacheRead`):
+
+| record field | Codex usage field |
+| --- | --- |
+| `input` | `input_tokens - cached_input_tokens - cache_write_input_tokens` |
+| `output` | `output_tokens` (reasoning tokens are already inside it) |
+| `cacheCreation` | `cache_write_input_tokens` |
+| `cacheRead` | `cached_input_tokens` |
+
+So total input tokens equals Codex's `input_tokens`. Usage from several `turn.completed` events is summed. `numTurns` is the number of shell and MCP tool calls plus one for the final answer, an approximation of model calls; Claude's `num_turns` is not the same measure, so compare turns within one agent only.
+
+Records are tagged `agent: "claude"|"codex"` (older records without the field are Claude). Resume keys, the lock file (`.lock-codex` for Codex, `.lock` for Claude), the report sections and every paired comparison are per agent, so the two never mix. Running both agents at the same time on one machine works but perturbs durations.
+
 ## Where things go
 
 Everything lives under `~/.cache/distill-bench/` (override with `DISTILL_BENCH_DIR`):
 
 - `corpus/` downloaded documents, verified by SHA-256 (a mismatch is an error for that document only, 60 second timeout, 50 MB cap).
 - `results/runs.jsonl` one JSON line per run, appended immediately, accumulating across nights.
-- `results/bench-report.md` and `results/report.json` from `npm run bench:report` (`--results`, `--since YYYY-MM-DD`, `--model`, `--out`).
+- `results/bench-report.md` and `results/report.json` from `npm run bench:report` (`--results`, `--since YYYY-MM-DD`, `--model`, `--agent claude|codex`, `--out`).
 - `logs/` nightly logs.
 - `distill-<version>/` shallow clones of the distill repo used for the plugin.
 
@@ -95,7 +136,7 @@ It writes `~/Library/LaunchAgents/dev.distill-bench.nightly.plist` and loads it 
 npm test
 ```
 
-The runner is tested end to end with a fake `claude` executable that prints stream-json; no real calls are made. The runner tests are skipped on Windows; the benchmark is a macOS tool and runs on Linux too.
+The runner is tested end to end with fake `claude` and `codex` executables that print stream-json and JSONL; no real calls are made. The runner tests are skipped on Windows; the benchmark is a macOS tool and runs on Linux too.
 
 ## License
 

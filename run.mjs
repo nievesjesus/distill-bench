@@ -1,5 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { getAgent } from './lib/agents/index.mjs';
 import { parseArgs } from './lib/args.mjs';
 import { acquireLock } from './lib/lock.mjs';
 import { buildPlan, budgetReached, finishedKeys, limitPaired, nightCost, unitKey } from './lib/plan.mjs';
@@ -46,19 +47,26 @@ async function main() {
   const results = args.results || resultsDir(env);
   mkdirSync(results, { recursive: true });
   const runsFile = join(results, 'runs.jsonl');
-  const claude = args.claude || env.DISTILL_BENCH_CLAUDE || 'claude';
+  const agent = getAgent(args.agent);
+  const bin = agent.resolveBin(args, env);
+  const modelSettings = agent.resolveModel(args, env);
+  const modelLabel = agent.modelLabel(modelSettings);
+  if (!agent.hasCost) {
+    console.log(`${agent.name} reports no cost in USD: --max-cost-usd and --run-budget-usd do not apply. Runs are capped by --max-runs ${args['max-runs']}${args['max-runs-defaulted'] ? ' (default for this agent)' : ''}.`);
+  }
 
   const scenarios = args.scenario === 'both' ? ['dev', 'clean'] : [args.scenario];
   let plan = buildPlan({ tasks, arms: args.arms, repeats: args.repeats, seed, scenarios });
   const pairUp = (units) => (args.paired ? limitPaired(units, args['max-runs']) : units);
   if (args['dry-run']) {
     plan = pairUp(plan);
+    if (!agent.hasCost) plan = plan.slice(0, args['max-runs']);
     for (const unit of plan) console.log(`${unit.task.id} ${unit.arm} ${unit.scenario} #${unit.repeat}`);
     console.log(`${plan.length} runs planned for ${night}`);
     return;
   }
 
-  const release = acquireLock(join(results, '.lock'));
+  const release = acquireLock(join(results, agent.name === 'claude' ? '.lock' : `.lock-${agent.name}`));
   if (release === null) throw new Error('Another benchmark runner holds the lock.');
   for (const signal of ['SIGINT', 'SIGTERM']) {
     process.on(signal, () => {
@@ -72,19 +80,21 @@ async function main() {
     if (args.resume) {
       const done = finishedKeys(existing);
       const before = plan.length;
-      plan = plan.filter((unit) => !done.has(unitKey(night, unit.task.id, unit.arm, unit.repeat, args.model, unit.scenario)));
+      plan = plan.filter((unit) => !done.has(unitKey(night, unit.task.id, unit.arm, unit.repeat, modelLabel, unit.scenario, agent.name)));
       console.log(`Resume: ${before - plan.length} of ${before} runs already done for ${night}`);
     }
     plan = pairUp(plan);
-    const spent = Object.fromEntries(scenarios.map((scenario) => [scenario, nightCost(existing, night, scenario)]));
+    const spent = Object.fromEntries(scenarios.map((scenario) => [scenario, nightCost(existing, night, scenario, agent.name)]));
     const limit = args['max-cost-usd'] / scenarios.length;
     const exhausted = new Set();
-    const spentLabel = () => (scenarios.length === 1 ? `$${spent[scenarios[0]].toFixed(2)}` : scenarios.map((scenario) => `$${spent[scenario].toFixed(2)} ${scenario}`).join(', '));
+    const spentLabel = () => (!agent.hasCost ? 'n/a' :scenarios.length === 1 ? `$${spent[scenarios[0]].toFixed(2)}` : scenarios.map((scenario) => `$${spent[scenario].toFixed(2)} ${scenario}`).join(', '));
     const pluginDir = args.arms.includes('distill') ? resolvePluginDir({ distillRepo: args['distill-repo'], packageSpec: args.package }) : null;
     if (pluginDir !== null) console.log(`distill plugin: ${pluginDir}`);
     const options = {
-      claude,
-      model: args.model,
+      agent: agent.name,
+      bin,
+      model: modelSettings.model,
+      reasoning: modelSettings.reasoning,
       night,
       packageSpec: args.package,
       pluginDir,
@@ -123,7 +133,7 @@ async function main() {
       });
       if (!final.ok) failures += 1;
       const verdict = final.ok ? (final.correct === true ? 'correct' : final.correct === false ? 'wrong' : 'no answer') : `failed (${final.error})`;
-      console.log(`[${started}/${plan.length}] ${unit.task.id} ${unit.arm} ${unit.scenario} #${unit.repeat}: ${verdict} $${final.costUsd.toFixed(3)}`);
+      console.log(`[${started}/${plan.length}] ${unit.task.id} ${unit.arm} ${unit.scenario} #${unit.repeat}: ${verdict} ${typeof final.costUsd === 'number' ? `$${final.costUsd.toFixed(3)}` : 'n/a'}`);
     }
     console.log(`Done: ${started} runs, ${failures} failed, ${spentLabel()} spent tonight, results in ${runsFile}`);
   } finally {
