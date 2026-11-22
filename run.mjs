@@ -88,7 +88,7 @@ async function main() {
     const limit = args['max-cost-usd'] / scenarios.length;
     const exhausted = new Set();
     const spentLabel = () => (!agent.hasCost ? 'n/a' :scenarios.length === 1 ? `$${spent[scenarios[0]].toFixed(2)}` : scenarios.map((scenario) => `$${spent[scenario].toFixed(2)} ${scenario}`).join(', '));
-    const pluginDir = args.arms.includes('distill') ? resolvePluginDir({ distillRepo: args['distill-repo'], packageSpec: args.package }) : null;
+    const pluginDir = args.arms.includes('distill') && agent.usesPluginDir !== false ? resolvePluginDir({ distillRepo: args['distill-repo'], packageSpec: args.package }) : null;
     if (pluginDir !== null) console.log(`distill plugin: ${pluginDir}`);
     const options = {
       agent: agent.name,

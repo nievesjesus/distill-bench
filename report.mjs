@@ -18,7 +18,7 @@ function parseReportArgs(argv) {
     if (value === undefined || value.startsWith('--')) throw new Error(`--${key} needs a value`);
     values[key] = value;
   }
-  if (values.agent !== '' && !['claude', 'codex'].includes(values.agent)) throw new Error('--agent must be claude or codex');
+  if (values.agent !== '' && !['claude', 'codex', 'opencode'].includes(values.agent)) throw new Error('--agent must be claude, codex or opencode');
   if (values.since !== '' &&!/^\d{4}-\d{2}-\d{2}$/.test(values.since)) throw new Error('--since must be YYYY-MM-DD');
   return values;
 }

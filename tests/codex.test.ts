@@ -255,7 +255,7 @@ describe('codex options', () => {
     expect(parseArgs([])).toMatchObject({ agent: 'claude', 'max-runs': Number.POSITIVE_INFINITY, 'max-runs-defaulted': false });
     expect(parseArgs(['--agent', 'codex'])).toMatchObject({ agent: 'codex', 'max-runs': 20, 'max-runs-defaulted': true });
     expect(parseArgs(['--agent', 'codex', '--max-runs', '5'])).toMatchObject({ 'max-runs': 5, 'max-runs-defaulted': false });
-    expect(() => parseArgs(['--agent', 'gemini'])).toThrow('--agent must be claude or codex');
+    expect(() => parseArgs(['--agent', 'gemini'])).toThrow('--agent must be claude, codex or opencode');
     expect(() => parseArgs(['--codex-reasoning', 'extreme'])).toThrow('--codex-reasoning');
     expect(parseArgs(['--codex-model', 'm', '--codex-reasoning', 'low', '--codex-bin', '/x'])).toMatchObject({ 'codex-model': 'm', 'codex-reasoning': 'low', 'codex-bin': '/x' });
   });

@@ -61,3 +61,20 @@ describe('buildArgs', () => {
     expect(buildArgs({ ...base, arm: 'distill', userSettings: true })).not.toContain('--setting-sources');
   });
 });
+
+describe('claude env', () => {
+  const base = { baseEnv: { PATH: '/bin' }, packageSpec: 'distill-llm@1', cacheDir: '/c' };
+
+  it('turns off the claude.ai connectors on both arms and keeps them with userSettings', async () => {
+    const { claudeAgent } = await load('agents/claude.mjs');
+    for (const arm of ['baseline', 'distill']) {
+      expect(claudeAgent.buildEnv({ ...base, arm }).ENABLE_CLAUDEAI_MCP_SERVERS).toBe('false');
+      expect(claudeAgent.buildEnv({ ...base, arm, userSettings: true })).not.toHaveProperty('ENABLE_CLAUDEAI_MCP_SERVERS');
+    }
+  });
+
+  it('does not add it to the shared env builder', async () => {
+    const { buildEnv } = await load('agents/env.mjs');
+    expect(buildEnv({ ...base, arm: 'distill' })).not.toHaveProperty('ENABLE_CLAUDEAI_MCP_SERVERS');
+  });
+});
