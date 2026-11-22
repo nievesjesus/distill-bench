@@ -12,7 +12,9 @@ It exists because token-saving claims are easy to make and hard to trust. A rebu
   - `clean`: a per-run directory goes first on `PATH` with stubs for `pdftotext`, `pdfinfo`, `pdftoppm`, `pdfimages`, `pdftohtml`, `mutool`, `qpdf`, `gs` and `textutil` that print "command not found" and exit 127, and `PYTHONNOUSERSITE=1` hides `pip --user` packages. Nothing on your system is touched. Python libraries from the system interpreter's site-packages are not hidden; runs that use them are labelled `bash-python`.
 - **Paths.** Each run is labelled with the paths it took: `read`, `read-pages`, `read-converted` (distill's hook rewrote the read), `mcp-distill`, `skill-distill` (`distill-llm convert` through Bash), `bash-pdftools`, `bash-python` and `bash-other`. The report shows the share of runs per path and the distill-used rate, because a "saving" in runs where distill never ran is noise.
 - **Tasks.** `tasks.json` has about 43 questions over 20 public documents (US government reports, NIST publications, CC BY arXiv papers, Office files) tagged `simple`, `deep`, `table`, `table-reasoning`, `chart`, `office`, `multi` and `summary`. Every expected answer was checked against the original document with an independent extractor (`pdftotext`, unzipped XML) and carries a `source` (page and snippet). `corpus.json` lists the documents by URL and SHA-256 only; nothing is redistributed.
-- **Statistics.** Medians with the interquartile range per arm. Paired comparison per task (distill cost / baseline cost, and the same for total input tokens), then the median ratio over tasks with a seeded bootstrap 95% confidence interval (2,000 resamples). Every table and every paired comparison is computed inside one scenario.
+- **Multi-document tasks.** A task has either `"doc": "id"` or `"docs": ["idA", "idB"]`, never both. With `docs`, every document is copied into the run's project folder and the prompt lists all the files (`about the files a.pdf and b.pdf in this folder`); the single-document prompt is unchanged. Records keep `doc` as the joined ids, for example `"idA+idB"`, and `doc:<id>` in `--tasks` matches a task that uses that document. `bench:fetch` downloads the whole corpus, so it needs no change.
+- **Audio and video tasks.** Tasks tagged `audio` or `video` need distill's local speech models. See "Shared speech models" below.
+- **Statistics.** Medians with the interquartile range per arm. Paired comparison per task (distill cost / baseline cost, and the same for total input tokens), then the median ratio over tasks with a seeded bootstrap 95% confidence interval (2,000 resamples). Beside each ratio the report shows the median per-task difference, distill minus baseline, in USD (when the agent has cost), in total input tokens and in turns, for example `Cost: median ratio 1.04x (95% CI ...), median delta +$0.002 per task`; a negative delta means distill used less. The deltas are also in `report.json` (`overall.costDelta`, `overall.tokensDelta`, `overall.turnsDelta`, and `costDelta`, `tokenDelta`, `turnsDelta` per pair). Every table and every paired comparison is computed inside one scenario.
 
 ## Honesty rules
 
@@ -50,6 +52,17 @@ Useful options of `npm run bench`:
 
 Both arms run in a fresh temp folder with a fresh distill cache (`DISTILL_CACHE_DIR`, supported by distill releases that include it, which is newer than 0.7.0; with older packages the cache is not isolated). Both arms run with `--setting-sources project,local`, so the operator's user-level settings, plugins and hooks do not leak in; pass `--user-settings` to turn that isolation off. Claude runs also get `ENABLE_CLAUDEAI_MCP_SERVERS=false` (unless `--user-settings`): any run with an MCP server, the distill arm, would otherwise load the operator's claude.ai account connectors, which adds hundreds of tools, varies from run to run and defeats the prompt cache, so the distill arm looked about twice as expensive for reasons unrelated to distill. The distill arm also allows the plugin's MCP server (`mcp__plugin_distill_distill`), since headless mode refuses MCP calls that are not allowed.
 
+## Shared speech models
+
+Each run gets a fresh `DISTILL_CACHE_DIR`, and distill would otherwise download about 700 MB of speech models (the ASR runtime and the Parakeet model) into every one. Install them once into a shared folder, `~/.cache/distill-bench/asr-cache` (override with `DISTILL_BENCH_ASR_DIR`):
+
+```bash
+npm run bench:asr-install
+npm run bench:asr-install -- --package distill-llm@0.9.0
+```
+
+That runs `npx -y <package> asr install` (default `distill-llm@latest`) with `DISTILL_CACHE_DIR` set to the shared folder. In every run of a task tagged `audio` or `video`, the runner symlinks `asr` (the runtime) and `asr-models` (the models, the VAD file and the default-model marker) from the run's cache folder to the shared folder before the agent starts, on both arms. The baseline never reads them, and the distill arm does not pay the install. Runs of other tasks get no links. If the shared folder has no models, the runner prints one warning at start and still runs; distill then reports `asr_unavailable`, which is recorded as the outcome.
+
 ## Codex
 
 The same tasks, arms, scenarios, grading and report also run against the OpenAI Codex CLI. Pass `--agent codex` (default `claude`):
@@ -72,7 +85,9 @@ The model and reasoning are recorded together as `model`, for example `gpt-6-ast
 
 **Cost and usage.** Codex prints no cost in USD, and with a ChatGPT login its usage counts against plan limits, not dollars. Records carry `costUsd: null` and the report shows `n/a` in every cost column; the comparison is on total input tokens, turns and duration. `--max-cost-usd` does not apply, so for `--agent codex` the runner caps the run with `--max-runs`, defaulting to 20 when you did not pass one, and prints a note.
 
-**What the distill arm means for Codex.** Codex has no Read tool; it reads files through the shell, so distill's Read hook never applies. The distill arm only adds distill's MCP server (`mcp_servers.distill.*` overrides pointing at the plugin's `scripts/run.mjs mcp`, with `DISTILL_PLUGIN_PACKAGE`, `DISTILL_CACHE_DIR` and `CLAUDE_PLUGIN_ROOT` in the server's `env` table, because Codex sanitizes the MCP environment) and sets `default_tools_approval_mode="approve"` for it. The baseline arm has no MCP overrides at all. The `read`, `read-pages` and `read-converted` paths therefore never occur for Codex; shell reads show up as `bash-other` (or `bash-pdftools`, `bash-python`), MCP calls as `mcp-distill`, and an MCP call Codex refused for approval or permission as `mcp-denied`, so a refusal is never counted as use. A generic MCP failure counts as use.
+**What the distill arm means for Codex.** Codex has no Read tool; it reads files through the shell, so distill's Read hook never applies. The distill arm adds distill's skill (see below) and distill's MCP server (`mcp_servers.distill.*` overrides pointing at the plugin's `scripts/run.mjs mcp`, with `DISTILL_PLUGIN_PACKAGE`, `DISTILL_CACHE_DIR` and `CLAUDE_PLUGIN_ROOT` in the server's `env` table, because Codex sanitizes the MCP environment) and sets `default_tools_approval_mode="approve"` for it. The baseline arm has no MCP overrides at all. The `read`, `read-pages` and `read-converted` paths therefore never occur for Codex; shell reads show up as `bash-other` (or `bash-pdftools`, `bash-python`), MCP calls as `mcp-distill`, and an MCP call Codex refused for approval or permission as `mcp-denied`, so a refusal is never counted as use. A generic MCP failure counts as use.
+
+**The skill.** The real `distill-llm agents install --codex` registers the MCP server and also installs the `distill-documents` skill under `~/.agents/skills`. So the distill arm gets the skill too: before Codex starts, the runner runs `npx -y <package> agents install --codex --dry-run` (it only prints, and the real install is refused under `npx`), takes the skill text from that output with the same parser the OpenCode arm uses, and writes it to `<run>/home/.agents/skills/distill-documents/SKILL.md`, inside the per-run `HOME`. The baseline arm gets no skill. A failed dry run is recorded as a run error and Codex is not started. With `--user-settings` the real `HOME` is kept and nothing is written.
 
 **Skill isolation.** Codex ignores `--ignore-user-config` for user skills (it reads `~/.agents/skills`), so each Codex run gets its own `HOME` under the run directory with `CODEX_HOME` pinned to the real Codex home (auth keeps working) and the distill MCP server gets the real `HOME` and `PATH`; `--user-settings` keeps the real `HOME` for Codex too.
 
@@ -129,6 +144,7 @@ Everything lives under `~/.cache/distill-bench/` (override with `DISTILL_BENCH_D
 
 - `corpus/` downloaded documents, verified by SHA-256 (a mismatch is an error for that document only, 60 second timeout, 50 MB cap).
 - `results/runs.jsonl` one JSON line per run, appended immediately, accumulating across nights.
+- `asr-cache/` shared speech runtime and models for audio and video tasks, from `npm run bench:asr-install` (`DISTILL_BENCH_ASR_DIR`).
 - `results/bench-report.md` and `results/report.json` from `npm run bench:report` (`--results`, `--since YYYY-MM-DD`, `--model`, `--agent claude|codex|opencode`, `--out`).
 - `logs/` nightly logs.
 - `distill-<version>/` shallow clones of the distill repo used for the plugin.
