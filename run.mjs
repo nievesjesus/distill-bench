@@ -93,6 +93,7 @@ async function main() {
       timeoutMs: args['timeout-ms'],
       baseEnv: env,
       keep: args.keep,
+      userSettings: args['user-settings'],
     };
     let started = 0;
     let failures = 0;

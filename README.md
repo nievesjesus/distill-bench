@@ -48,7 +48,7 @@ Useful options of `npm run bench`:
 | `--distill-repo <path>` | a local distill checkout for the plugin. By default the tag `v<version of --package>` is shallow-cloned into `~/.cache/distill-bench/distill-<version>/` once |
 | `--max-cost-usd`, `--max-runs`, `--resume`, `--results <dir>`, `--dry-run` | budget, caps, skip what tonight already did, results folder, print the plan |
 
-Both arms run in a fresh temp folder with a fresh distill cache (`DISTILL_CACHE_DIR`, supported by distill releases that include it, which is newer than 0.7.0; with older packages the cache is not isolated). User-level Claude settings and plugins are shared by both arms.
+Both arms run in a fresh temp folder with a fresh distill cache (`DISTILL_CACHE_DIR`, supported by distill releases that include it, which is newer than 0.7.0; with older packages the cache is not isolated). Both arms run with `--setting-sources project,local`, so the operator's user-level settings, plugins and hooks do not leak in; pass `--user-settings` to turn that isolation off. The distill arm also allows the plugin's MCP server (`mcp__plugin_distill_distill`), since headless mode refuses MCP calls that are not allowed.
 
 ## Where things go
 
